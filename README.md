@@ -39,7 +39,7 @@ Python-проект: получение данных о погоде через 
 | HTTP-запросы | `requests` |
 | База данных | SQLite 3 (встроенный модуль `sqlite3`) |
 | Визуализация | `plotly` (offline, HTML-файл) |
-| Дашборд | HTML + CSS + JavaScript + Chart.js |
+| Дашборд | HTML + CSS + JavaScript |
 | API | [Open-Meteo](https://open-meteo.com/) (бесплатно, без ключа) |
 
 ---
@@ -49,8 +49,7 @@ Python-проект: получение данных о погоде через 
 ```
 WeatherAnalytics/
 ├── main.py                # Основной скрипт
-├── weather_dashboard.html # Интерактивный дашборд (тёмная/светлая тема)
-├── weather_chart.html     # График, генерируется при запуске main.py
+├── weather_dashboard.html # Интерактивный дашборд
 └── weather.db             # База данных SQLite, создаётся автоматически
 ```
 
