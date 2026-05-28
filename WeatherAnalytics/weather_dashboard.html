@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Погода в Москве — дашборд</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg-page:        #0f1117;
+    --bg-card:        #1a1d27;
+    --bg-card2:       #21253a;
+    --border:         rgba(255,255,255,0.08);
+    --text-primary:   #f0f2ff;
+    --text-secondary: #8b90b8;
+    --text-muted:     #555a7a;
+    --accent-hot:     #ff6b6b;
+    --accent-cold:    #4ea8de;
+    --accent-range:   #f9a825;
+    --accent-avg:     #a78bfa;
+    --radius-sm:      8px;
+    --radius-md:      14px;
+    --radius-lg:      20px;
+  }
+  [data-theme="light"] {
+    --bg-page:        #f0f2f8;
+    --bg-card:        #ffffff;
+    --bg-card2:       #f7f8fc;
+    --border:         rgba(0,0,0,0.08);
+    --text-primary:   #1a1d27;
+    --text-secondary: #555a7a;
+    --text-muted:     #aab0cc;
+    --accent-hot:     #e53935;
+    --accent-cold:    #1565c0;
+    --accent-range:   #f57f17;
+    --accent-avg:     #7c3aed;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 0 0 3rem;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    padding: 1.25rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .header-icon {
+    width: 42px; height: 42px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, #4ea8de 0%, #a78bfa 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .header h1 {
+    font-size: 1.2rem; font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  .header-sub {
+    font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;
+  }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: var(--radius-sm);
+    font-size: 0.82rem; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--border); background: var(--bg-card2);
+    color: var(--text-primary); transition: all 0.2s; text-decoration: none;
+  }
+  .btn:hover { border-color: rgba(255,255,255,0.2); background: var(--bg-card); }
+  .btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+
+  /* ── MAIN LAYOUT ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  /* ── METRICS GRID ── */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 1.75rem;
+  }
+  .metric-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 1.1rem 1.25rem;
+    position: relative; overflow: hidden;
+    opacity: 0; transform: translateY(16px);
+    animation: fadeUp 0.45s ease forwards;
+  }
+  .metric-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  }
+  .metric-card.hot::before   { background: var(--accent-hot); }
+  .metric-card.cold::before  { background: var(--accent-cold); }
+  .metric-card.range::before { background: var(--accent-range); }
+  .metric-card.avg::before   { background: var(--accent-avg); }
+
+  .metric-label {
+    font-size: 0.72rem; font-weight: 500; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-secondary); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .metric-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .metric-value {
+    font-size: 2rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1;
+  }
+  .metric-sub { font-size: 0.77rem; color: var(--text-secondary); margin-top: 6px; }
+
+  /* ── CHART CARD ── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1.75rem;
+    opacity: 0; transform: translateY(16px);
+    animation: fadeUp 0.5s ease forwards;
+  }
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;
+  }
+  .card-title {
+    font-size: 0.95rem; font-weight: 600; letter-spacing: -0.01em;
+  }
+  .legend { display: flex; gap: 16px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-secondary); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* ── TABLE ── */
+  .table-controls {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;
+  }
+  .sort-hint { font-size: 0.78rem; color: var(--text-muted); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  thead tr { border-bottom: 1px solid var(--border); }
+  th {
+    padding: 0.7rem 1rem; text-align: left;
+    font-size: 0.72rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--text-secondary); cursor: pointer;
+    user-select: none; white-space: nowrap;
+    transition: color 0.2s;
+  }
+  th:hover { color: var(--text-primary); }
+  th.sorted { color: var(--text-primary); }
+  th .sort-arrow { margin-left: 4px; opacity: 0.5; }
+  th.sorted .sort-arrow { opacity: 1; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+    opacity: 0; transform: translateX(-8px);
+    animation: slideIn 0.35s ease forwards;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--bg-card2); }
+  tbody tr.highlight-hot  { background: rgba(255,107,107,0.06); }
+  tbody tr.highlight-cold { background: rgba(78,168,222,0.06); }
+
+  td { padding: 0.75rem 1rem; }
+  td.date-cell { font-weight: 500; font-variant-numeric: tabular-nums; }
+  td.temp-cell { font-variant-numeric: tabular-nums; font-weight: 500; }
+  td.temp-cell.hot  { color: var(--accent-hot); }
+  td.temp-cell.cold { color: var(--accent-cold); }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 0.68rem; font-weight: 600; padding: 2px 8px;
+    border-radius: 20px; margin-left: 6px; vertical-align: middle;
+  }
+  .badge-hot  { background: rgba(255,107,107,0.15); color: var(--accent-hot); }
+  .badge-cold { background: rgba(78,168,222,0.15);  color: var(--accent-cold); }
+
+  .bar-container { display: flex; align-items: center; gap: 8px; }
+  .bar-track { flex: 1; height: 6px; border-radius: 3px; background: var(--bg-card2); overflow: hidden; }
+  .bar-fill  { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+  .bar-label { font-size: 0.75rem; color: var(--text-secondary); min-width: 36px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ── FOOTER ── */
+  .footer { text-align: center; font-size: 0.78rem; color: var(--text-muted); margin-top: 2.5rem; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slideIn {
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    .header { padding: 1rem; }
+    .container { padding: 1.25rem 1rem; }
+    .metric-value { font-size: 1.6rem; }
+    th, td { padding: 0.6rem 0.65rem; }
+    .bar-container { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <div class="header-icon">🌤</div>
+    <div>
+      <h1>Погода в Москве</h1>
+      <div class="header-sub" id="update-time">Загрузка...</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="btn" onclick="toggleTheme()" id="theme-btn" aria-label="Переключить тему">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M18.66 5.34l1.41-1.41"/></svg>
+      <span id="theme-label">Светлая тема</span>
+    </button>
+    <button class="btn" onclick="location.reload()" aria-label="Обновить">
+      <svg viewBox="0 0 24 24"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+      Обновить
+    </button>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main class="container">
+
+  <!-- METRIC CARDS -->
+  <div class="metrics-grid" id="metrics-grid"></div>
+
+  <!-- CHART -->
+  <div class="card" style="animation-delay:0.15s">
+    <div class="card-header">
+      <div class="card-title">Температура за 7 дней</div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent-hot)"></div>Максимум</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent-cold)"></div>Минимум</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent-range)"></div>Диапазон</div>
+      </div>
+    </div>
+    <div style="position:relative;height:280px"><canvas id="weatherChart"></canvas></div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="card" style="animation-delay:0.25s">
+    <div class="card-header">
+      <div class="card-title">Данные по дням</div>
+      <div class="sort-hint">Нажмите на заголовок для сортировки</div>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="weather-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable('date')"    data-col="date">    Дата <span class="sort-arrow">↕</span></th>
+            <th onclick="sortTable('temp_max')" data-col="temp_max">Макс. °C <span class="sort-arrow">↕</span></th>
+            <th onclick="sortTable('temp_min')" data-col="temp_min">Мин. °C <span class="sort-arrow">↕</span></th>
+            <th>Диапазон</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer">
+    Данные: <a href="https://open-meteo.com" style="color:var(--accent-cold)">Open-Meteo API</a> &nbsp;·&nbsp;
+    Координаты: 55.75°N, 37.62°E &nbsp;·&nbsp; Часовой пояс: Europe/Moscow
+  </div>
+
+</main>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+// Данные берутся из Python-скрипта. При интеграции замените этот массив
+// на данные, вставленные Jinja2 / json.dumps() из weather.db.
+const weatherData = [
+  { date: "2026-05-21", temp_max: 31.2, temp_min: 20.0 },
+  { date: "2026-05-22", temp_max: 29.5, temp_min: 16.7 },
+  { date: "2026-05-23", temp_max: 21.1, temp_min: 15.0 },
+  { date: "2026-05-24", temp_max: 22.2, temp_min: 12.4 },
+  { date: "2026-05-25", temp_max: 19.0, temp_min: 12.2 },
+  { date: "2026-05-26", temp_max: 14.3, temp_min:  9.0 },
+  { date: "2026-05-27", temp_max: 13.5, temp_min:  7.7 },
+];
+
+// ── COMPUTED ANALYTICS ───────────────────────────────────────────────────────
+const maxTemps  = weatherData.map(d => d.temp_max);
+const minTemps  = weatherData.map(d => d.temp_min);
+const ranges    = weatherData.map(d => +(d.temp_max - d.temp_min).toFixed(1));
+const avgMax    = +(maxTemps.reduce((a,b)=>a+b,0)/maxTemps.length).toFixed(1);
+const avgMin    = +(minTemps.reduce((a,b)=>a+b,0)/minTemps.length).toFixed(1);
+const hotIdx    = maxTemps.indexOf(Math.max(...maxTemps));
+const coldIdx   = minTemps.indexOf(Math.min(...minTemps));
+const tempRange = +(Math.max(...maxTemps) - Math.min(...minTemps)).toFixed(1);
+const maxRange  = Math.max(...ranges);
+
+// ── TIMESTAMP ────────────────────────────────────────────────────────────────
+const lastDate = weatherData[weatherData.length-1].date;
+document.getElementById('update-time').textContent =
+  'Данные за 7 дней · последняя запись: ' + lastDate;
+
+// ── METRIC CARDS ─────────────────────────────────────────────────────────────
+const metricsGrid = document.getElementById('metrics-grid');
+const metrics = [
+  { label:'Ср. максимум',    value: avgMax + ' °C',  sub: 'за 7 дней', cls:'hot',   dot:'var(--accent-hot)' },
+  { label:'Ср. минимум',     value: avgMin + ' °C',  sub: 'за 7 дней', cls:'cold',  dot:'var(--accent-cold)' },
+  { label:'Самый тёплый',    value: maxTemps[hotIdx] + ' °C', sub: weatherData[hotIdx].date,  cls:'hot',   dot:'var(--accent-hot)' },
+  { label:'Самый холодный',  value: minTemps[coldIdx] + ' °C', sub: weatherData[coldIdx].date, cls:'cold',  dot:'var(--accent-cold)' },
+  { label:'Температурный размах', value: tempRange + ' °C', sub: 'макс – мин за период', cls:'range', dot:'var(--accent-range)' },
+];
+metrics.forEach((m, i) => {
+  const card = document.createElement('div');
+  card.className = 'metric-card ' + m.cls;
+  card.style.animationDelay = (i * 0.07) + 's';
+  card.innerHTML = `
+    <div class="metric-label">
+      <span class="metric-dot" style="background:${m.dot}"></span>
+      ${m.label}
+    </div>
+    <div class="metric-value">${m.value}</div>
+    <div class="metric-sub">${m.sub}</div>`;
+  metricsGrid.appendChild(card);
+});
+
+// ── CHART ─────────────────────────────────────────────────────────────────────
+const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
+const gridColor  = () => isDark() ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
+const labelColor = () => isDark() ? '#8b90b8' : '#555a7a';
+const labels = weatherData.map(d => {
+  const dt = new Date(d.date);
+  return dt.toLocaleDateString('ru-RU', { day:'2-digit', month:'short' });
+});
+
+const chartData = {
+  labels,
+  datasets: [
+    {
+      label: 'Максимум',
+      data: maxTemps,
+      borderColor: '#ff6b6b',
+      backgroundColor: 'rgba(255,107,107,0.12)',
+      pointBackgroundColor: '#ff6b6b',
+      pointRadius: 5, pointHoverRadius: 7,
+      tension: 0.35, fill: false, yAxisID: 'y',
+    },
+    {
+      label: 'Минимум',
+      data: minTemps,
+      borderColor: '#4ea8de',
+      backgroundColor: 'rgba(78,168,222,0.12)',
+      pointBackgroundColor: '#4ea8de',
+      pointRadius: 5, pointHoverRadius: 7,
+      tension: 0.35, fill: '-1', yAxisID: 'y',
+    },
+    {
+      label: 'Диапазон',
+      data: ranges,
+      type: 'bar',
+      backgroundColor: 'rgba(249,168,37,0.45)',
+      borderColor: '#f9a825',
+      borderWidth: 1, borderRadius: 4,
+      yAxisID: 'y2',
+    }
+  ]
+};
+
+const ctx = document.getElementById('weatherChart').getContext('2d');
+let chart = new Chart(ctx, {
+  type: 'line',
+  data: chartData,
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: isDark() ? '#1a1d27' : '#fff',
+        borderColor: isDark() ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+        borderWidth: 1,
+        titleColor: isDark() ? '#f0f2ff' : '#1a1d27',
+        bodyColor: isDark() ? '#8b90b8' : '#555a7a',
+        padding: 12,
+        callbacks: {
+          label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + ' °C'
+        }
+      }
+    },
+    scales: {
+      y: {
+        position: 'left',
+        grid: { color: gridColor() },
+        ticks: { color: labelColor(), callback: v => v + ' °C' },
+        title: { display: true, text: 'Температура, °C', color: labelColor(), font: { size: 11 } }
+      },
+      y2: {
+        position: 'right',
+        grid: { drawOnChartArea: false },
+        ticks: { color: labelColor(), callback: v => v + ' °C' },
+        title: { display: true, text: 'Диапазон', color: labelColor(), font: { size: 11 } }
+      },
+      x: {
+        grid: { color: gridColor() },
+        ticks: { color: labelColor() }
+      }
+    }
+  }
+});
+
+// ── TABLE ─────────────────────────────────────────────────────────────────────
+let sortCol = 'date', sortAsc = true;
+
+function renderTable(data) {
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+  data.forEach((row, i) => {
+    const rng   = +(row.temp_max - row.temp_min).toFixed(1);
+    const pct   = Math.round((rng / maxRange) * 100);
+    const isHot = i === data.findIndex(r => r.temp_max === Math.max(...data.map(d=>d.temp_max)));
+    const isCold= i === data.findIndex(r => r.temp_min === Math.min(...data.map(d=>d.temp_min)));
+    const tr = document.createElement('tr');
+    tr.style.animationDelay = (i * 0.04) + 's';
+    if (isHot)  tr.classList.add('highlight-hot');
+    if (isCold) tr.classList.add('highlight-cold');
+    tr.innerHTML = `
+      <td class="date-cell">${row.date}
+        ${isHot  ? '<span class="badge badge-hot">🔥 тепло</span>'  : ''}
+        ${isCold ? '<span class="badge badge-cold">❄️ холодно</span>' : ''}
+      </td>
+      <td class="temp-cell hot">${row.temp_max > 0 ? '+' : ''}${row.temp_max.toFixed(1)}</td>
+      <td class="temp-cell cold">${row.temp_min > 0 ? '+' : ''}${row.temp_min.toFixed(1)}</td>
+      <td>
+        <div class="bar-container">
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${pct}%;background:var(--accent-range)"></div>
+          </div>
+          <span class="bar-label">${rng.toFixed(1)} °C</span>
+        </div>
+        <span style="display:none" class="mobile-range">${rng.toFixed(1)} °C</span>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function sortTable(col) {
+  if (sortCol === col) { sortAsc = !sortAsc; }
+  else { sortCol = col; sortAsc = true; }
+  document.querySelectorAll('th').forEach(th => {
+    th.classList.remove('sorted');
+    const arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = '↕';
+  });
+  const activeTh = document.querySelector(`th[data-col="${col}"]`);
+  if (activeTh) {
+    activeTh.classList.add('sorted');
+    activeTh.querySelector('.sort-arrow').textContent = sortAsc ? '↑' : '↓';
+  }
+  const sorted = [...weatherData].sort((a,b) => {
+    const va = a[col], vb = b[col];
+    return sortAsc ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+  });
+  renderTable(sorted);
+}
+
+renderTable(weatherData);
+
+// ── THEME TOGGLE ──────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const dark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', dark ? 'light' : 'dark');
+  document.getElementById('theme-label').textContent = dark ? 'Тёмная тема' : 'Светлая тема';
+  if (chart) {
+    chart.options.scales.y.grid.color   = gridColor();
+    chart.options.scales.x.grid.color   = gridColor();
+    chart.options.scales.y.ticks.color  = labelColor();
+    chart.options.scales.x.ticks.color  = labelColor();
+    chart.options.scales.y2.ticks.color = labelColor();
+    chart.update();
+  }
+}
+</script>
+</body>
+</html>
