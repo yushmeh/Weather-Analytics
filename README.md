@@ -4,6 +4,7 @@
 [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org)
 [![Plotly](https://img.shields.io/badge/Plotly-offline-3F4F75?style=for-the-badge&logo=plotly&logoColor=white)](https://plotly.com/python/)
 [![API](https://img.shields.io/badge/API-Open--Meteo-00B4D8?style=for-the-badge)](https://open-meteo.com)
+[![Style](https://img.shields.io/badge/UI-Dark%20%2F%20Light%20Dashboard-607D8B?style=for-the-badge)](https://developer.mozilla.org/en-US/docs/Web/CSS)
 
 **Weather Analytics** — Python-скрипт для получения погодных данных через открытый API, сохранения в базу данных SQLite, расчёта аналитических метрик и интерактивной визуализации результатов в браузере. Повторный запуск безопасен: данные обновляются через `UPSERT`, дубликатов не возникает.
 
